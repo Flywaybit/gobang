@@ -44,6 +44,7 @@ func main() {
 
 	authService = service.NewAuthService(store.Users)
 	matchSvc = service.NewMatchService(manager, store.Games, botPool)
+	go startWebServer()
 
 	listener, err := net.Listen("tcp", "127.0.0.1:8888")
 	if err != nil {
@@ -73,6 +74,9 @@ func main() {
 			continue
 		}
 		player := manager.AddConn(conn)
+		player.Send = func(msg *pb.GameMsg) error {
+			return sendMsg(conn, msg)
+		}
 		go handlePlayer(player)
 	}
 }
@@ -92,34 +96,38 @@ func handlePlayer(player *session.PlayerSession) {
 			fmt.Println("玩家离线:", player.Username)
 			return
 		}
-		switch msg.MsgType {
-		case pb.MsgType_MSG_REGISTER_REQ:
-			handleRegister(player, msg)
-		case pb.MsgType_MSG_LOGIN_REQ:
-			handleLogin(player, msg)
-		case pb.MsgType_MSG_MATCH_REQ:
-			handleMatchRequest(player, msg)
-		case pb.MsgType_MSG_PUT:
-			handlePut(player, msg)
-		case pb.MsgType_MSG_QUIT_GAME:
-			handleQuitGame(player)
-		default:
-			_ = sendMsg(player.Conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "未知消息类型"})
-		}
+		handleGameMsg(player, msg)
+	}
+}
+
+func handleGameMsg(player *session.PlayerSession, msg *pb.GameMsg) {
+	switch msg.MsgType {
+	case pb.MsgType_MSG_REGISTER_REQ:
+		handleRegister(player, msg)
+	case pb.MsgType_MSG_LOGIN_REQ:
+		handleLogin(player, msg)
+	case pb.MsgType_MSG_MATCH_REQ:
+		handleMatchRequest(player, msg)
+	case pb.MsgType_MSG_PUT:
+		handlePut(player, msg)
+	case pb.MsgType_MSG_QUIT_GAME:
+		handleQuitGame(player)
+	default:
+		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "未知消息类型"})
 	}
 }
 
 func handleRegister(player *session.PlayerSession, msg *pb.GameMsg) {
 	user, err := authService.Register(msg.Username, msg.Password)
 	if err != nil {
-		_ = sendMsg(player.Conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_REGISTER_RESP, Tip: err.Error()})
+		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_REGISTER_RESP, Tip: err.Error()})
 		return
 	}
 	if err := manager.Authenticate(player, user.UserID, user.Username); err != nil {
-		_ = sendMsg(player.Conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_REGISTER_RESP, Tip: err.Error()})
+		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_REGISTER_RESP, Tip: err.Error()})
 		return
 	}
-	_ = sendMsg(player.Conn, &pb.GameMsg{
+	sendToPlayer(player, &pb.GameMsg{
 		MsgType:  pb.MsgType_MSG_REGISTER_RESP,
 		UserId:   user.UserID,
 		Username: user.Username,
@@ -130,14 +138,14 @@ func handleRegister(player *session.PlayerSession, msg *pb.GameMsg) {
 func handleLogin(player *session.PlayerSession, msg *pb.GameMsg) {
 	user, err := authService.Login(msg.Username, msg.Password)
 	if err != nil {
-		_ = sendMsg(player.Conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_LOGIN_RESP, Tip: err.Error()})
+		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_LOGIN_RESP, Tip: err.Error()})
 		return
 	}
 	if err := manager.Authenticate(player, user.UserID, user.Username); err != nil {
-		_ = sendMsg(player.Conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_LOGIN_RESP, Tip: err.Error()})
+		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_LOGIN_RESP, Tip: err.Error()})
 		return
 	}
-	_ = sendMsg(player.Conn, &pb.GameMsg{
+	sendToPlayer(player, &pb.GameMsg{
 		MsgType:  pb.MsgType_MSG_LOGIN_RESP,
 		UserId:   user.UserID,
 		Username: user.Username,
@@ -147,13 +155,13 @@ func handleLogin(player *session.PlayerSession, msg *pb.GameMsg) {
 
 func handleMatchRequest(player *session.PlayerSession, msg *pb.GameMsg) {
 	if player.State != session.StateAuthenticated {
-		_ = sendMsg(player.Conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "请先登录或注册"})
+		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "请先登录或注册"})
 		return
 	}
 	if msg.VsBot {
 		game, err := matchSvc.JoinBot(player)
 		if err != nil {
-			_ = sendMsg(player.Conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: err.Error()})
+			sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: err.Error()})
 			return
 		}
 		sendToPlayer(game.Black, service.StartMsg(pb.ChessType_BLACK, game.Black.UserID))
@@ -164,11 +172,11 @@ func handleMatchRequest(player *session.PlayerSession, msg *pb.GameMsg) {
 	}
 	game, matched, err := matchSvc.Join(player)
 	if err != nil {
-		_ = sendMsg(player.Conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "匹配失败: " + err.Error()})
+		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "匹配失败: " + err.Error()})
 		return
 	}
 	if !matched {
-		_ = sendMsg(player.Conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_WAIT, Tip: "已进入匹配队列，等待对手..."})
+		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_WAIT, Tip: "已进入匹配队列，等待对手..."})
 		return
 	}
 	sendToPlayer(game.Black, service.StartMsg(pb.ChessType_BLACK, game.Black.UserID))
@@ -177,12 +185,12 @@ func handleMatchRequest(player *session.PlayerSession, msg *pb.GameMsg) {
 
 func handlePut(player *session.PlayerSession, msg *pb.GameMsg) {
 	if player.State != session.StatePlaying {
-		_ = sendMsg(player.Conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "当前不在对局中"})
+		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "当前不在对局中"})
 		return
 	}
 	game := manager.GetGame(player.GameID)
 	if game == nil {
-		_ = sendMsg(player.Conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "对局不存在"})
+		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "对局不存在"})
 		return
 	}
 
@@ -220,7 +228,7 @@ func handlePut(player *session.PlayerSession, msg *pb.GameMsg) {
 	game.Mu.Unlock()
 
 	if tip != "" {
-		_ = sendMsg(player.Conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: tip})
+		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: tip})
 		return
 	}
 
@@ -254,16 +262,21 @@ func handlePut(player *session.PlayerSession, msg *pb.GameMsg) {
 }
 
 func handleQuitGame(player *session.PlayerSession) {
+	if player.State == session.StateMatching {
+		manager.CancelMatching(player)
+		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "已退出匹配队列"})
+		return
+	}
 	if player.GameID == "" {
 		player.State = session.StateAuthenticated
-		_ = sendMsg(player.Conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "已退出房间"})
+		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "已退出房间"})
 		return
 	}
 	game := manager.GetGame(player.GameID)
 	if game == nil {
 		player.State = session.StateAuthenticated
 		player.GameID = ""
-		_ = sendMsg(player.Conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "已回到主菜单"})
+		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "已回到主菜单"})
 		return
 	}
 
@@ -413,10 +426,16 @@ func playBotTurn(game *session.GameContext) {
 }
 
 func sendToPlayer(player *session.PlayerSession, msg *pb.GameMsg) {
-	if player == nil || player.IsBot || player.Conn == nil {
+	if player == nil || player.IsBot {
 		return
 	}
-	_ = sendMsg(player.Conn, msg)
+	if player.Send != nil {
+		_ = player.Send(msg)
+		return
+	}
+	if player.Conn != nil {
+		_ = sendMsg(player.Conn, msg)
+	}
 }
 
 func broadcastGame(game *session.GameContext, msg *pb.GameMsg) {

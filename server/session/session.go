@@ -20,6 +20,7 @@ const (
 
 type PlayerSession struct {
 	Conn     net.Conn
+	Send     func(*pb.GameMsg) error
 	UserID   int32
 	Username string
 	State    State
@@ -45,6 +46,7 @@ type GameContext struct {
 type Manager struct {
 	mu       sync.Mutex
 	players  map[net.Conn]*PlayerSession
+	sessions map[*PlayerSession]struct{}
 	byUserID map[int32]*PlayerSession
 	games    map[string]*GameContext
 	queue    []*PlayerSession
@@ -54,6 +56,7 @@ type Manager struct {
 func NewManager() *Manager {
 	return &Manager{
 		players:  make(map[net.Conn]*PlayerSession),
+		sessions: make(map[*PlayerSession]struct{}),
 		byUserID: make(map[int32]*PlayerSession),
 		games:    make(map[string]*GameContext),
 	}
@@ -64,6 +67,15 @@ func (m *Manager) AddConn(conn net.Conn) *PlayerSession {
 	defer m.mu.Unlock()
 	s := &PlayerSession{Conn: conn, State: StateUnauthenticated}
 	m.players[conn] = s
+	m.sessions[s] = struct{}{}
+	return s
+}
+
+func (m *Manager) AddSession(send func(*pb.GameMsg) error) *PlayerSession {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s := &PlayerSession{Send: send, State: StateUnauthenticated}
+	m.sessions[s] = struct{}{}
 	return s
 }
 
@@ -115,6 +127,23 @@ func (m *Manager) Enqueue(s *PlayerSession) *PlayerSession {
 		return nil
 	}
 	return opponent
+}
+
+func (m *Manager) CancelMatching(s *PlayerSession) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if s.State != StateMatching {
+		return false
+	}
+	for i, queued := range m.queue {
+		if queued == s {
+			m.queue = append(m.queue[:i], m.queue[i+1:]...)
+			s.State = StateAuthenticated
+			return true
+		}
+	}
+	s.State = StateAuthenticated
+	return true
 }
 
 func (m *Manager) CreateGame(black, white *PlayerSession, dbID bson.ObjectID) *GameContext {
@@ -198,6 +227,34 @@ func (m *Manager) RemoveConn(conn net.Conn) (*PlayerSession, *GameContext) {
 		return nil, nil
 	}
 	delete(m.players, conn)
+	delete(m.sessions, s)
+	if s.UserID != 0 {
+		delete(m.byUserID, s.UserID)
+	}
+	for i, queued := range m.queue {
+		if queued == s {
+			m.queue = append(m.queue[:i], m.queue[i+1:]...)
+			break
+		}
+	}
+	var game *GameContext
+	if s.GameID != "" {
+		game = m.games[s.GameID]
+		delete(m.games, s.GameID)
+	}
+	return s, game
+}
+
+func (m *Manager) RemoveSession(s *PlayerSession) (*PlayerSession, *GameContext) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.sessions[s]; !ok {
+		return nil, nil
+	}
+	delete(m.sessions, s)
+	if s.Conn != nil {
+		delete(m.players, s.Conn)
+	}
 	if s.UserID != 0 {
 		delete(m.byUserID, s.UserID)
 	}

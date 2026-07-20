@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoBang</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app">
+    <section class="panel auth" id="authPanel">
+      <h1>五子棋对战</h1>
+      <div class="tabs">
+        <button id="loginTab" class="active">登录</button>
+        <button id="registerTab">注册</button>
+      </div>
+      <input id="username" placeholder="用户名" autocomplete="username">
+      <input id="password" type="password" placeholder="密码" autocomplete="current-password">
+      <button id="authBtn">登录</button>
+      <p id="authTip"></p>
+    </section>
+
+    <section class="panel menu hidden" id="menuPanel">
+      <h2 id="welcome">主菜单</h2>
+      <button id="pvpBtn">匹配对战</button>
+      <button id="botBtn">人机对战</button>
+      <p id="menuTip"></p>
+    </section>
+
+    <section class="panel matching hidden" id="matchingPanel">
+      <h2>匹配中</h2>
+      <p id="matchingTip">正在寻找对手...</p>
+      <button id="cancelMatchBtn">退出匹配</button>
+    </section>
+
+    <section class="game hidden" id="gamePanel">
+      <header>
+        <div>
+          <h2 id="gameTitle">对局中</h2>
+          <p id="gameTip"></p>
+        </div>
+        <button id="quitBtn">退出房间</button>
+      </header>
+      <div id="board" class="board"></div>
+    </section>
+
+    <section class="modal hidden" id="resultModal">
+      <div class="dialog">
+        <h2>对局结算</h2>
+        <p id="resultText"></p>
+        <button id="nextBtn">继续匹配下一局</button>
+        <button id="backBtn">回到主菜单</button>
+      </div>
+    </section>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
