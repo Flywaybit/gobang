@@ -1,0 +1,38 @@
+syntax = "proto3";
+package gobang;
+option go_package = "./pb;pb"; // 生成代码输出到pb包
+
+// 棋子类型
+enum ChessType {
+    EMPTY = 0;
+    BLACK = 1;
+    WHITE = 2;
+}
+
+// 消息类型枚举
+enum MsgType {
+    MSG_WAIT = 0;    // 等待对手
+    MSG_START = 1;   // 对局开始
+    MSG_PUT = 2;     // 落子
+    MSG_WIN = 3;     // 分出胜负
+    MSG_TIP = 4;     // 普通提示消息
+    MSG_LOGIN_REQ = 5;      // 登录请求
+    MSG_QUIT_GAME = 6;      // 主动退出对局
+    MSG_LOGIN_RESP = 7;     // 登录响应
+    MSG_REGISTER_REQ = 8;   // 注册请求
+    MSG_REGISTER_RESP = 9;  // 注册响应
+    MSG_MATCH_REQ = 10;     // 匹配请求
+}
+
+// 对局通信统一消息体
+message GameMsg {
+    MsgType msg_type = 1;
+    ChessType chess = 2;    // 当前棋子/己方棋子
+    int32 x = 3;
+    int32 y = 4;
+    string tip = 5;
+    string username = 6;
+    string password = 7;
+    int32 user_id = 8;
+    bool vs_bot = 9;        // 是否匹配人机
+}
