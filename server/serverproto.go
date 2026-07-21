@@ -33,11 +33,11 @@ func main() {
 	var err error
 	store, err = dao.NewStore(ctx, "mongodb://127.0.0.1:27017", "gobang")
 	if err != nil {
-		fmt.Println("连接 MongoDB 失败:", err)
+		fmt.Println("MongoDB connection failed:", err)
 		return
 	}
 	if err := store.EnsureIndexes(ctx); err != nil {
-		fmt.Println("创建 MongoDB 索引失败:", err)
+		fmt.Println("MongoDB index initialization failed:", err)
 		return
 	}
 	defer store.Disconnect(context.Background())
@@ -48,17 +48,17 @@ func main() {
 
 	listener, err := net.Listen("tcp", "127.0.0.1:8888")
 	if err != nil {
-		fmt.Println("监听失败:", err)
+		fmt.Println("TCP listen failed:", err)
 		return
 	}
 	defer listener.Close()
-	fmt.Println("Protobuf五子棋服务端启动 :127.0.0.1:8888")
+	fmt.Println("Protobuf Gobang TCP server started: 127.0.0.1:8888")
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-stop
-		fmt.Println("正在关闭服务端...")
+		fmt.Println("Server shutting down...")
 		_ = listener.Close()
 		closeActiveGames()
 		_ = store.Disconnect(context.Background())
@@ -93,7 +93,7 @@ func handlePlayer(player *session.PlayerSession) {
 	for {
 		msg, err := readMsg(player.Conn)
 		if err != nil {
-			fmt.Println("玩家离线:", player.Username)
+			fmt.Println("TCP player disconnected:", player.Username)
 			return
 		}
 		handleGameMsg(player, msg)

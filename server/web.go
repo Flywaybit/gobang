@@ -36,9 +36,9 @@ func startWebServer() {
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.Dir(webDir())))
 	mux.HandleFunc("/ws", handleWebSocket)
-	fmt.Println("Web 前端启动 : http://127.0.0.1:8889")
+	fmt.Println("Web server started: http://127.0.0.1:8889")
 	if err := http.ListenAndServe("127.0.0.1:8889", mux); err != nil {
-		fmt.Println("Web 服务退出:", err)
+		fmt.Println("Web server stopped:", err)
 	}
 }
 
@@ -72,7 +72,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	for {
 		var webMsg WebMsg
 		if err := conn.ReadJSON(&webMsg); err != nil {
-			fmt.Println("Web 玩家离线:", player.Username)
+			fmt.Println("Web player disconnected:", player.Username)
 			return
 		}
 		handleGameMsg(player, toPB(webMsg))
