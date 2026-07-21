@@ -86,6 +86,7 @@ const (
 	MsgType_MSG_REGISTER_REQ  MsgType = 8  // 注册请求
 	MsgType_MSG_REGISTER_RESP MsgType = 9  // 注册响应
 	MsgType_MSG_MATCH_REQ     MsgType = 10 // 匹配请求
+	MsgType_MSG_DRAW          MsgType = 11 // 平局
 )
 
 // Enum value maps for MsgType.
@@ -102,6 +103,7 @@ var (
 		8:  "MSG_REGISTER_REQ",
 		9:  "MSG_REGISTER_RESP",
 		10: "MSG_MATCH_REQ",
+		11: "MSG_DRAW",
 	}
 	MsgType_value = map[string]int32{
 		"MSG_WAIT":          0,
@@ -115,6 +117,7 @@ var (
 		"MSG_REGISTER_REQ":  8,
 		"MSG_REGISTER_RESP": 9,
 		"MSG_MATCH_REQ":     10,
+		"MSG_DRAW":          11,
 	}
 )
 
@@ -272,7 +275,7 @@ const file_proto_gobang_proto_rawDesc = "" +
 	"\tChessType\x12\t\n" +
 	"\x05EMPTY\x10\x00\x12\t\n" +
 	"\x05BLACK\x10\x01\x12\t\n" +
-	"\x05WHITE\x10\x02*\xc7\x01\n" +
+	"\x05WHITE\x10\x02*\xd5\x01\n" +
 	"\aMsgType\x12\f\n" +
 	"\bMSG_WAIT\x10\x00\x12\r\n" +
 	"\tMSG_START\x10\x01\x12\v\n" +
@@ -285,7 +288,8 @@ const file_proto_gobang_proto_rawDesc = "" +
 	"\x10MSG_REGISTER_REQ\x10\b\x12\x15\n" +
 	"\x11MSG_REGISTER_RESP\x10\t\x12\x11\n" +
 	"\rMSG_MATCH_REQ\x10\n" +
-	"B\tZ\a./pb;pbb\x06proto3"
+	"\x12\f\n" +
+	"\bMSG_DRAW\x10\vB\tZ\a./pb;pbb\x06proto3"
 
 var (
 	file_proto_gobang_proto_rawDescOnce sync.Once

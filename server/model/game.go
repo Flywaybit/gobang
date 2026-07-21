@@ -9,6 +9,7 @@ import (
 const (
 	GameStatusOngoing     = "ongoing"
 	GameStatusFinished    = "finished"
+	GameStatusDraw        = "draw"
 	GameStatusInterrupted = "interrupted"
 )
 

@@ -64,6 +64,18 @@ func (d *GameDAO) Finish(ctx context.Context, gameID bson.ObjectID, winnerID int
 	return err
 }
 
+func (d *GameDAO) Draw(ctx context.Context, gameID bson.ObjectID) error {
+	now := time.Now()
+	_, err := d.coll.UpdateOne(ctx,
+		bson.D{{Key: "_id", Value: gameID}},
+		bson.D{{Key: "$set", Value: bson.D{
+			{Key: "status", Value: model.GameStatusDraw},
+			{Key: "ended_at", Value: now},
+		}}},
+	)
+	return err
+}
+
 func (d *GameDAO) Interrupt(ctx context.Context, gameID bson.ObjectID) error {
 	now := time.Now()
 	_, err := d.coll.UpdateOne(ctx,

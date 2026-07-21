@@ -75,6 +75,7 @@ function handleMessage(msg) {
       }
       break;
     case "MSG_WIN":
+    case "MSG_DRAW":
       state.status = Status.GameOver;
       $("resultText").textContent = msg.tip || "对局结束";
       $("gamePanel").classList.add("locked");

@@ -22,6 +22,7 @@ enum MsgType {
     MSG_REGISTER_REQ = 8;   // 注册请求
     MSG_REGISTER_RESP = 9;  // 注册响应
     MSG_MATCH_REQ = 10;     // 匹配请求
+    MSG_DRAW = 11;          // 平局
 }
 
 // 对局通信统一消息体

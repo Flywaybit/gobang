@@ -118,6 +118,8 @@ func msgTypeFromString(value string) pb.MsgType {
 		return pb.MsgType_MSG_PUT
 	case "MSG_QUIT_GAME":
 		return pb.MsgType_MSG_QUIT_GAME
+	case "MSG_DRAW":
+		return pb.MsgType_MSG_DRAW
 	default:
 		return pb.MsgType_MSG_TIP
 	}

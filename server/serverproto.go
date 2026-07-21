@@ -198,6 +198,7 @@ func handlePut(player *session.PlayerSession, msg *pb.GameMsg) {
 	selfChess := player.Chess
 	var putMsg *pb.GameMsg
 	var win bool
+	var draw bool
 	var tip string
 
 	game.Mu.Lock()
@@ -211,6 +212,9 @@ func handlePut(player *session.PlayerSession, msg *pb.GameMsg) {
 		game.Board[y][x] = selfChess
 		win = isWinLocked(game, int(x), int(y), selfChess)
 		if win {
+			game.Finished = true
+		} else if isBoardFullLocked(game) {
+			draw = true
 			game.Finished = true
 		} else if game.Current == pb.ChessType_BLACK {
 			game.Current = pb.ChessType_WHITE
@@ -254,6 +258,12 @@ func handlePut(player *session.PlayerSession, msg *pb.GameMsg) {
 		}
 		finishGame(game)
 		go persistGameResult(game.DBID, winnerID, loserID)
+		return
+	}
+	if draw {
+		broadcastGame(game, &pb.GameMsg{MsgType: pb.MsgType_MSG_DRAW, Tip: "棋盘已满，本局平局"})
+		finishGame(game)
+		go persistGameDraw(game.DBID)
 		return
 	}
 	if game.VsBot && game.Current == pb.ChessType_WHITE {
@@ -393,11 +403,15 @@ func playBotTurn(game *session.GameContext) {
 
 	var putMsg *pb.GameMsg
 	var win bool
+	var draw bool
 	game.Mu.Lock()
 	if !game.Finished && game.Current == bot.Chess && x >= 0 && x < Size && y >= 0 && y < Size && game.Board[y][x] == pb.ChessType_EMPTY {
 		game.Board[y][x] = bot.Chess
 		win = isWinLocked(game, int(x), int(y), bot.Chess)
 		if win {
+			game.Finished = true
+		} else if isBoardFullLocked(game) {
+			draw = true
 			game.Finished = true
 		} else {
 			game.Current = pb.ChessType_BLACK
@@ -422,6 +436,12 @@ func playBotTurn(game *session.GameContext) {
 		sendToPlayer(game.Black, &pb.GameMsg{MsgType: pb.MsgType_MSG_WIN, Chess: bot.Chess, UserId: winnerID, Tip: "Bot 五子连珠，你输了"})
 		finishGame(game)
 		go persistGameResult(game.DBID, winnerID, loserID)
+		return
+	}
+	if draw {
+		broadcastGame(game, &pb.GameMsg{MsgType: pb.MsgType_MSG_DRAW, Tip: "棋盘已满，本局平局"})
+		finishGame(game)
+		go persistGameDraw(game.DBID)
 	}
 }
 
@@ -453,6 +473,12 @@ func finishGame(game *session.GameContext) {
 	}
 }
 
+func persistGameDraw(gameID bson.ObjectID) {
+	ctx, cancel := dao.TimeoutContext()
+	defer cancel()
+	_ = store.Games.Draw(ctx, gameID)
+}
+
 func isWinLocked(game *session.GameContext, x, y int, chess pb.ChessType) bool {
 	dirs := [][]int{{1, 0}, {0, 1}, {1, 1}, {1, -1}}
 	for _, d := range dirs {
@@ -475,4 +501,15 @@ func isWinLocked(game *session.GameContext, x, y int, chess pb.ChessType) bool {
 		}
 	}
 	return false
+}
+
+func isBoardFullLocked(game *session.GameContext) bool {
+	for y := 0; y < Size; y++ {
+		for x := 0; x < Size; x++ {
+			if game.Board[y][x] == pb.ChessType_EMPTY {
+				return false
+			}
+		}
+	}
+	return true
 }

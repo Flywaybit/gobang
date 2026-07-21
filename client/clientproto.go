@@ -106,6 +106,15 @@ func recvLoop(conn net.Conn, app *ClientApp) {
 			app.notify()
 			fmt.Println("\n===== 对局结算 =====")
 			fmt.Println(msg.Tip)
+		case pb.MsgType_MSG_DRAW:
+			app.mu.Lock()
+			app.currentState = StatusGameOver
+			app.lastResult = msg.Tip
+			app.localBoard = [Size][Size]pb.ChessType{}
+			app.mu.Unlock()
+			app.notify()
+			fmt.Println("\n===== 对局结算 =====")
+			fmt.Println(msg.Tip)
 		case pb.MsgType_MSG_TIP:
 			fmt.Println("\n系统提示：", msg.Tip)
 		}
