@@ -40,6 +40,8 @@ type GameContext struct {
 	Current  pb.ChessType
 	Finished bool
 	VsBot    bool
+	AIVsAI   bool
+	Watcher  *PlayerSession
 	Mu       sync.Mutex
 }
 
@@ -178,6 +180,35 @@ func (m *Manager) CreateGameWithMode(black, white *PlayerSession, dbID bson.Obje
 	return game
 }
 
+func (m *Manager) CreateAIGame(black, white, watcher *PlayerSession, dbID bson.ObjectID) *GameContext {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id := dbID.Hex()
+	game := &GameContext{
+		ID:      id,
+		DBID:    dbID,
+		BlackID: black.UserID,
+		WhiteID: white.UserID,
+		Black:   black,
+		White:   white,
+		Current: pb.ChessType_BLACK,
+		AIVsAI:  true,
+		Watcher: watcher,
+	}
+	black.State = StatePlaying
+	white.State = StatePlaying
+	black.GameID = id
+	white.GameID = id
+	black.Chess = pb.ChessType_BLACK
+	white.Chess = pb.ChessType_WHITE
+	if watcher != nil {
+		watcher.State = StatePlaying
+		watcher.GameID = id
+	}
+	m.games[id] = game
+	return game
+}
+
 func (m *Manager) GetGame(id string) *GameContext {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -200,6 +231,10 @@ func (m *Manager) EndGame(game *GameContext) {
 	if game.White != nil && !game.White.IsBot {
 		game.White.State = StateAuthenticated
 		game.White.GameID = ""
+	}
+	if game.Watcher != nil {
+		game.Watcher.State = StateAuthenticated
+		game.Watcher.GameID = ""
 	}
 	delete(m.games, game.ID)
 }

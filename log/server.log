@@ -7,3 +7,82 @@
 2026-07-22 10:12:19 服务端推送：to_user_id=2 to_username=hhh msg_type=MSG_LOGIN_RESP chess=EMPTY x=0 y=0 tip=登录成功
 2026-07-22 10:12:20 玩家请求人机对战：user_id=2 username=hhh
 2026-07-22 10:18:31 服务端开始关闭
+2026-07-22 16:23:57 MongoDB 连接成功，数据库：gobang
+2026-07-22 16:23:57 TCP Protobuf 服务启动：127.0.0.1:8888
+2026-07-22 16:23:57 Web 服务启动：http://127.0.0.1:8889
+2026-07-22 16:24:08 服务端开始关闭
+2026-07-22 16:47:40 MongoDB 连接成功，数据库：gobang
+2026-07-22 16:47:40 TCP Protobuf 服务启动：127.0.0.1:8888
+2026-07-22 16:47:40 Web 服务启动：http://127.0.0.1:8889
+2026-07-22 16:47:48 WebSocket 客户端接入：127.0.0.1:57020
+2026-07-22 16:47:58 玩家登录成功：user_id=4 username=Jerry
+2026-07-22 16:47:58 服务端推送：to_user_id=4 to_username=Jerry msg_type=MSG_LOGIN_RESP chess=EMPTY x=0 y=0 tip=登录成功
+2026-07-22 16:48:09 服务端推送：to_user_id=4 to_username=Jerry msg_type=MSG_TIP chess=EMPTY x=0 y=0 tip=未到你的回合，请等待对手
+2026-07-22 16:48:20 服务端推送：to_user_id=4 to_username=Jerry msg_type=MSG_TIP chess=EMPTY x=0 y=0 tip=AI 调用失败：Post "https://api.openai.com/v1/responses": dial tcp 199.59.149.236:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond.
+2026-07-22 16:48:38 服务端推送：to_user_id=4 to_username=Jerry msg_type=MSG_TIP chess=EMPTY x=0 y=0 tip=已回到主菜单
+2026-07-22 16:48:40 服务端推送：to_user_id=4 to_username=Jerry msg_type=MSG_TIP chess=EMPTY x=0 y=0 tip=已退出房间
+2026-07-22 16:48:41 服务端推送：to_user_id=4 to_username=Jerry msg_type=MSG_TIP chess=EMPTY x=0 y=0 tip=已退出房间
+2026-07-22 16:49:25 Web 玩家离线：user_id=4 username=Jerry
+2026-07-22 16:50:00 服务端开始关闭
+2026-07-22 16:50:08 MongoDB 连接成功，数据库：gobang
+2026-07-22 16:50:08 TCP Protobuf 服务启动：127.0.0.1:8888
+2026-07-22 16:50:08 Web 服务启动：http://127.0.0.1:8889
+2026-07-22 16:50:19 WebSocket 客户端接入：127.0.0.1:52368
+2026-07-22 16:50:27 玩家登录成功：user_id=3 username=Tom
+2026-07-22 16:50:27 服务端推送：to_user_id=3 to_username=Tom msg_type=MSG_LOGIN_RESP chess=EMPTY x=0 y=0 tip=登录成功
+2026-07-22 16:50:49 服务端推送：to_user_id=3 to_username=Tom msg_type=MSG_TIP chess=EMPTY x=0 y=0 tip=AI 调用失败：Post "https://api.openai.com/v1/responses": dial tcp 31.13.94.41:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond.
+2026-07-22 16:51:38 服务端推送：to_user_id=3 to_username=Tom msg_type=MSG_TIP chess=EMPTY x=0 y=0 tip=已回到主菜单
+2026-07-22 16:55:33 MongoDB 连接成功，数据库：gobang
+2026-07-22 16:55:33 Web 服务启动：http://127.0.0.1:8889
+2026-07-22 16:55:33 TCP 监听失败：listen tcp 127.0.0.1:8888: bind: Only one usage of each socket address (protocol/network address/port) is normally permitted.
+2026-07-22 16:55:33 Web 服务停止：listen tcp 127.0.0.1:8889: bind: Only one usage of each socket address (protocol/network address/port) is normally permitted.
+2026-07-22 16:55:45 服务端开始关闭
+2026-07-22 16:55:52 MongoDB 连接成功，数据库：gobang
+2026-07-22 16:55:52 TCP Protobuf 服务启动：127.0.0.1:8888
+2026-07-22 16:55:52 Web 服务启动：http://127.0.0.1:8889
+2026-07-22 16:56:01 WebSocket 客户端接入：127.0.0.1:61212
+2026-07-22 16:56:09 玩家登录成功：user_id=1 username=wanghaisheng
+2026-07-22 16:56:09 服务端推送：to_user_id=1 to_username=wanghaisheng msg_type=MSG_LOGIN_RESP chess=EMPTY x=0 y=0 tip=登录成功
+2026-07-22 16:56:31 服务端推送：to_user_id=1 to_username=wanghaisheng msg_type=MSG_TIP chess=EMPTY x=0 y=0 tip=AI 调用失败：Post "https://api.openai.com/v1/responses": dial tcp 69.171.234.48:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond.
+2026-07-22 16:56:47 服务端推送：to_user_id=1 to_username=wanghaisheng msg_type=MSG_TIP chess=EMPTY x=0 y=0 tip=已回到主菜单
+2026-07-22 20:39:44 MongoDB 连接成功，数据库：gobang
+2026-07-22 20:39:44 TCP Protobuf 服务启动：127.0.0.1:8888
+2026-07-22 20:39:44 Web 服务启动：http://127.0.0.1:8889
+2026-07-22 20:42:36 服务端开始关闭
+2026-07-22 20:42:44 MongoDB 连接成功，数据库：gobang
+2026-07-22 20:42:44 TCP Protobuf 服务启动：127.0.0.1:8888
+2026-07-22 20:42:44 Web 服务启动：http://127.0.0.1:8889
+2026-07-22 20:42:58 WebSocket 客户端接入：127.0.0.1:63096
+2026-07-22 20:43:06 玩家登录成功：user_id=3 username=Tom
+2026-07-22 20:43:06 服务端推送：to_user_id=3 to_username=Tom msg_type=MSG_LOGIN_RESP chess=EMPTY x=0 y=0 tip=登录成功
+2026-07-22 20:43:08 AI 对战使用 OpenAI 代理地址：https://outllm.chaoziran.com/v1
+2026-07-22 20:43:14 服务端推送：to_user_id=3 to_username=Tom msg_type=MSG_TIP chess=EMPTY x=0 y=0 tip=已退出房间
+2026-07-22 20:43:15 服务端推送：to_user_id=3 to_username=Tom msg_type=MSG_TIP chess=EMPTY x=0 y=0 tip=请先登录或注册
+2026-07-22 20:43:18 服务端推送：to_user_id=3 to_username=Tom msg_type=MSG_TIP chess=EMPTY x=0 y=0 tip=已回到主菜单
+2026-07-22 20:43:19 玩家请求人机对战：user_id=3 username=Tom
+2026-07-22 20:44:12 Web 玩家离线：user_id=3 username=Tom
+2026-07-22 20:45:29 服务端开始关闭
+2026-07-22 20:46:58 MongoDB 连接成功，数据库：gobang
+2026-07-22 20:46:58 TCP Protobuf 服务启动：127.0.0.1:8888
+2026-07-22 20:46:58 Web 服务启动：http://127.0.0.1:8889
+2026-07-22 20:47:04 WebSocket 客户端接入：127.0.0.1:54201
+2026-07-22 20:47:11 玩家登录成功：user_id=2 username=hhh
+2026-07-22 20:47:11 服务端推送：to_user_id=2 to_username=hhh msg_type=MSG_LOGIN_RESP chess=EMPTY x=0 y=0 tip=登录成功
+2026-07-22 20:47:30 玩家请求人机对战：user_id=2 username=hhh
+2026-07-22 20:49:44 Web 玩家离线：user_id=2 username=hhh
+2026-07-22 20:49:51 服务端开始关闭
+2026-07-22 21:08:03 MongoDB 连接成功，数据库：gobang
+2026-07-22 21:08:03 Web 服务启动：http://127.0.0.1:8889
+2026-07-22 21:08:03 TCP Protobuf 服务启动：127.0.0.1:8888
+2026-07-22 21:08:11 WebSocket 客户端接入：127.0.0.1:52227
+2026-07-22 21:08:18 玩家登录成功：user_id=1 username=wanghaisheng
+2026-07-22 21:08:18 服务端推送：to_user_id=1 to_username=wanghaisheng msg_type=MSG_LOGIN_RESP chess=EMPTY x=0 y=0 tip=登录成功
+2026-07-22 21:08:19 玩家请求人机对战：user_id=1 username=wanghaisheng
+2026-07-22 21:08:25 服务端推送：to_user_id=1 to_username=wanghaisheng msg_type=MSG_TIP chess=EMPTY x=0 y=0 tip=已退出房间
+2026-07-22 21:08:39 玩家请求人机对战：user_id=1 username=wanghaisheng
+2026-07-22 21:09:21 玩家进入匹配队列：user_id=1 username=wanghaisheng
+2026-07-22 21:09:21 服务端推送：to_user_id=1 to_username=wanghaisheng msg_type=MSG_WAIT chess=EMPTY x=0 y=0 tip=已进入匹配队列，等待对手...
+2026-07-22 21:09:23 玩家退出匹配队列：user_id=1 username=wanghaisheng
+2026-07-22 21:09:23 服务端推送：to_user_id=1 to_username=wanghaisheng msg_type=MSG_TIP chess=EMPTY x=0 y=0 tip=已退出匹配队列
+2026-07-22 21:09:52 Web 玩家离线：user_id=1 username=wanghaisheng
+2026-07-22 21:16:12 服务端开始关闭

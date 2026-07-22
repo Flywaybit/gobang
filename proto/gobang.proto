@@ -36,4 +36,5 @@ message GameMsg {
     string password = 7;
     int32 user_id = 8;
     bool vs_bot = 9;        // 是否匹配人机
+    bool ai_vs_ai = 10;     // 是否 AI 自动对战
 }

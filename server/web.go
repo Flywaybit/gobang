@@ -21,6 +21,7 @@ type WebMsg struct {
 	Password string `json:"password,omitempty"`
 	UserID   int32  `json:"user_id,omitempty"`
 	VsBot    bool   `json:"vs_bot,omitempty"`
+	AIVsAI   bool   `json:"ai_vs_ai,omitempty"`
 }
 
 type wsPeer struct {
@@ -91,6 +92,7 @@ func toPB(msg WebMsg) *pb.GameMsg {
 		Password: msg.Password,
 		UserId:   msg.UserID,
 		VsBot:    msg.VsBot,
+		AiVsAi:   msg.AIVsAI,
 	}
 }
 
@@ -104,6 +106,7 @@ func fromPB(msg *pb.GameMsg) WebMsg {
 		Username: msg.Username,
 		UserID:   msg.UserId,
 		VsBot:    msg.VsBot,
+		AIVsAI:   msg.AiVsAi,
 	}
 }
 

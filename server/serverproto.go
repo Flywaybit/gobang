@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -171,6 +172,10 @@ func handleLogin(player *session.PlayerSession, msg *pb.GameMsg) {
 func handleMatchRequest(player *session.PlayerSession, msg *pb.GameMsg) {
 	if player.State != session.StateAuthenticated {
 		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "请先登录或注册"})
+		return
+	}
+	if msg.AiVsAi {
+		startAIVsAIGame(player)
 		return
 	}
 	if msg.VsBot {
@@ -475,6 +480,155 @@ func playBotTurn(game *session.GameContext) {
 	}
 }
 
+func startAIVsAIGame(watcher *session.PlayerSession) {
+	aiClient, err := service.NewOpenAIClientFromEnv()
+	if err != nil {
+		sendToPlayer(watcher, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: err.Error()})
+		return
+	}
+	applog.Servicef("AI 对战使用 OpenAI 代理地址：%s", aiClient.BaseURL())
+	black := &session.PlayerSession{UserID: -101, Username: "AI_BLACK", State: session.StateAuthenticated, IsBot: true}
+	white := &session.PlayerSession{UserID: -102, Username: "AI_WHITE", State: session.StateAuthenticated, IsBot: true}
+	ctx, cancel := dao.TimeoutContext()
+	defer cancel()
+	gameID, err := store.Games.CreateOngoing(ctx, black.UserID, white.UserID)
+	if err != nil {
+		sendToPlayer(watcher, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "创建 AI 对战记录失败：" + err.Error()})
+		return
+	}
+	game := manager.CreateAIGame(black, white, watcher, gameID)
+	logGameStart(game)
+	modelName := aiClient.Model()
+	sendToPlayer(watcher, &pb.GameMsg{
+		MsgType: pb.MsgType_MSG_START,
+		Chess:   pb.ChessType_BLACK,
+		Tip:     fmt.Sprintf("AI 对战\n黑方模型：%s\n白方模型：%s", modelName, modelName),
+	})
+	go runAIVsAILoop(game, aiClient)
+}
+
+func runAIVsAILoop(game *session.GameContext, aiClient *service.OpenAIClient) {
+	var moves []model.Move
+	last := "-"
+	for turn := 1; turn <= Size*Size; turn++ {
+		game.Mu.Lock()
+		if game.Finished {
+			game.Mu.Unlock()
+			return
+		}
+		current := game.Current
+		board := game.Board
+		game.Mu.Unlock()
+
+		player := service.OpenAIPlayer{Color: current, PromptFile: "prompts/black_agent.txt"}
+		if current == pb.ChessType_WHITE {
+			player.PromptFile = "prompts/white_agent.txt"
+		}
+		myMoves, oppMoves := splitMoves(moves, current)
+		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		x, y, err := aiClient.NextMove(ctx, player, service.AIMoveContext{
+			MyMoves:  myMoves,
+			OppMoves: oppMoves,
+			Turn:     turn,
+			Last:     last,
+		})
+		cancel()
+		if err != nil {
+			sendToPlayer(game.Watcher, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "AI 调用失败：" + err.Error()})
+			finishGame(game)
+			logGameEnd(game, "AI调用失败", 0, 0)
+			go persistGameDraw(game.DBID)
+			return
+		}
+		if x < 0 || x >= Size || y < 0 || y >= Size || board[y][x] != pb.ChessType_EMPTY {
+			fx, fy, ok := service.BestBotMove(board, current)
+			if !ok {
+				broadcastGame(game, &pb.GameMsg{MsgType: pb.MsgType_MSG_DRAW, Tip: "棋盘已满，本局平局"})
+				finishGame(game)
+				logGameEnd(game, "平局", 0, 0)
+				go persistGameDraw(game.DBID)
+				return
+			}
+			x, y = fx, fy
+		}
+		if applyAIMove(game, current, x, y, &moves) {
+			return
+		}
+		last = fmt.Sprintf("(%d,%d)", x, y)
+		time.Sleep(350 * time.Millisecond)
+	}
+}
+
+func applyAIMove(game *session.GameContext, chess pb.ChessType, x, y int32, moves *[]model.Move) bool {
+	userID := game.BlackID
+	if chess == pb.ChessType_WHITE {
+		userID = game.WhiteID
+	}
+	var win, draw bool
+	game.Mu.Lock()
+	if game.Finished || game.Current != chess || x < 0 || x >= Size || y < 0 || y >= Size || game.Board[y][x] != pb.ChessType_EMPTY {
+		game.Mu.Unlock()
+		return false
+	}
+	game.Board[y][x] = chess
+	win = isWinLocked(game, int(x), int(y), chess)
+	if win {
+		game.Finished = true
+	} else if isBoardFullLocked(game) {
+		draw = true
+		game.Finished = true
+	} else if chess == pb.ChessType_BLACK {
+		game.Current = pb.ChessType_WHITE
+	} else {
+		game.Current = pb.ChessType_BLACK
+	}
+	game.Mu.Unlock()
+
+	putMsg := &pb.GameMsg{MsgType: pb.MsgType_MSG_PUT, Chess: chess, X: x, Y: y, UserId: userID}
+	broadcastGame(game, putMsg)
+	logMove(game, userID, chess, x, y)
+	move := model.Move{UserID: userID, Chess: int32(chess), X: x, Y: y, At: time.Now()}
+	*moves = append(*moves, move)
+	go func() {
+		ctx, cancel := dao.TimeoutContext()
+		defer cancel()
+		_ = store.Games.AddMove(ctx, game.DBID, move)
+	}()
+	if win {
+		loserID := game.WhiteID
+		if chess == pb.ChessType_WHITE {
+			loserID = game.BlackID
+		}
+		broadcastGame(game, &pb.GameMsg{MsgType: pb.MsgType_MSG_WIN, Chess: chess, UserId: userID, Tip: "AI 对战结束，" + chess.String() + " 获胜"})
+		finishGame(game)
+		logGameEnd(game, "胜负", userID, loserID)
+		go persistGameResult(game.DBID, userID, loserID)
+		return true
+	}
+	if draw {
+		broadcastGame(game, &pb.GameMsg{MsgType: pb.MsgType_MSG_DRAW, Tip: "棋盘已满，本局平局"})
+		finishGame(game)
+		logGameEnd(game, "平局", 0, 0)
+		go persistGameDraw(game.DBID)
+		return true
+	}
+	return false
+}
+
+func splitMoves(moves []model.Move, chess pb.ChessType) (string, string) {
+	var mine []string
+	var opp []string
+	for _, move := range moves {
+		item := fmt.Sprintf("(%d,%d)", move.X, move.Y)
+		if pb.ChessType(move.Chess) == chess {
+			mine = append(mine, item)
+		} else {
+			opp = append(opp, item)
+		}
+	}
+	return strings.Join(mine, ","), strings.Join(opp, ",")
+}
+
 func sendToPlayer(player *session.PlayerSession, msg *pb.GameMsg) {
 	if player == nil || player.IsBot {
 		return
@@ -493,6 +647,7 @@ func sendToPlayer(player *session.PlayerSession, msg *pb.GameMsg) {
 func broadcastGame(game *session.GameContext, msg *pb.GameMsg) {
 	sendToPlayer(game.Black, msg)
 	sendToPlayer(game.White, msg)
+	sendToPlayer(game.Watcher, msg)
 }
 
 func logGameStart(game *session.GameContext) {

@@ -14,6 +14,7 @@ const state = {
   username: "",
   chess: "EMPTY",
   matchVsBot: false,
+  matchMode: "pvp",
   board: Array.from({ length: 15 }, () => Array(15).fill("EMPTY")),
 };
 
@@ -63,8 +64,13 @@ function handleMessage(msg) {
       resetBoard();
       $("resultModal").classList.add("hidden");
       $("gamePanel").classList.remove("locked");
-      $("gameTitle").textContent = state.chess === "BLACK" ? "你执黑棋" : "你执白棋";
-      $("gameTip").textContent = msg.tip || "";
+      if (msg.tip && msg.tip.startsWith("AI 对战")) {
+        $("gameTitle").textContent = "AI 对战";
+        $("gameTip").innerHTML = msg.tip.split("\n").slice(1).map(escapeHtml).join("<br>");
+      } else {
+        $("gameTitle").textContent = state.chess === "BLACK" ? "你执黑棋" : "你执白棋";
+        $("gameTip").textContent = msg.tip || "";
+      }
       show("gamePanel");
       renderBoard();
       break;
@@ -78,6 +84,7 @@ function handleMessage(msg) {
     case "MSG_DRAW":
       state.status = Status.GameOver;
       $("resultText").textContent = msg.tip || "对局结束";
+      updateResultActions();
       $("gamePanel").classList.add("locked");
       $("resultModal").classList.remove("hidden");
       break;
@@ -89,6 +96,20 @@ function handleMessage(msg) {
 }
 
 function handleTip(tip) {
+  if (tip.includes("已退出房间") || tip.includes("已回到主菜单")) {
+    state.status = Status.Menu;
+    $("resultModal").classList.add("hidden");
+    $("gamePanel").classList.remove("locked");
+    $("menuTip").textContent = tip;
+    show("menuPanel");
+    return;
+  }
+  if (state.status === Status.Matching && (tip.includes("OPENAI") || tip.includes("AI ") || tip.includes("OpenAI"))) {
+    state.status = Status.Menu;
+    $("menuTip").textContent = tip;
+    show("menuPanel");
+    return;
+  }
   if (state.status === Status.Matching && tip.includes("退出匹配")) {
     state.status = Status.Menu;
     $("menuTip").textContent = tip;
@@ -115,6 +136,7 @@ function syncControls() {
   const isPlaying = state.status === Status.Playing;
   $("pvpBtn").disabled = !isMenu;
   $("botBtn").disabled = !isMenu;
+  $("aiBattleBtn").disabled = !isMenu;
   $("cancelMatchBtn").disabled = !isMatching;
   $("quitBtn").disabled = !isPlaying;
 }
@@ -123,10 +145,32 @@ function startMatch(vsBot) {
   if (state.status !== Status.Menu) return;
   state.status = Status.Matching;
   state.matchVsBot = vsBot;
+  state.matchMode = vsBot ? "bot" : "pvp";
   $("matchingTip").textContent = vsBot ? "正在创建人机对局..." : "正在寻找对手...";
   show("matchingPanel");
   syncControls();
   send({ msg_type: "MSG_MATCH_REQ", user_id: state.userId, vs_bot: vsBot });
+}
+
+function startAiBattle() {
+  if (state.status !== Status.Menu) return;
+  state.status = Status.Matching;
+  state.matchVsBot = false;
+  state.matchMode = "ai";
+  $("matchingTip").textContent = "正在创建 AI 对战...";
+  show("matchingPanel");
+  syncControls();
+  send({ msg_type: "MSG_MATCH_REQ", user_id: state.userId, ai_vs_ai: true });
+}
+
+function updateResultActions() {
+  if (state.matchMode === "bot") {
+    $("nextBtn").textContent = "继续人机对战";
+  } else if (state.matchMode === "ai") {
+    $("nextBtn").textContent = "继续 AI 对战";
+  } else {
+    $("nextBtn").textContent = "继续匹配下一局";
+  }
 }
 
 function cancelMatch() {
@@ -145,6 +189,17 @@ function resetBoard() {
 function renderBoard() {
   const board = $("board");
   board.innerHTML = "";
+  for (let i = 0; i < 15; i++) {
+    const vertical = document.createElement("span");
+    vertical.className = "grid-line vertical";
+    vertical.style.left = pointPercent(i);
+    board.appendChild(vertical);
+
+    const horizontal = document.createElement("span");
+    horizontal.className = "grid-line horizontal";
+    horizontal.style.top = pointPercent(i);
+    board.appendChild(horizontal);
+  }
   [[3, 3], [11, 3], [7, 7], [3, 11], [11, 11]].forEach(([x, y]) => {
     const star = document.createElement("span");
     star.className = "star";
@@ -171,6 +226,16 @@ function renderBoard() {
 
 function pointPercent(index) {
   return `${7 + (index / 14) * 86}%`;
+}
+
+function escapeHtml(text) {
+  return text.replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  }[char]));
 }
 
 $("loginTab").onclick = () => {
@@ -200,11 +265,18 @@ $("authBtn").onclick = () => {
 
 $("pvpBtn").onclick = () => startMatch(false);
 $("botBtn").onclick = () => startMatch(true);
+$("aiBattleBtn").onclick = startAiBattle;
 $("cancelMatchBtn").onclick = cancelMatch;
 
 $("quitBtn").onclick = () => {
   if (state.status !== Status.Playing) return;
   send({ msg_type: "MSG_QUIT_GAME" });
+  state.status = Status.Menu;
+  $("resultModal").classList.add("hidden");
+  $("gamePanel").classList.remove("locked");
+  $("menuTip").textContent = "已退出房间";
+  show("menuPanel");
+  syncControls();
 };
 
 $("nextBtn").onclick = () => {
@@ -214,7 +286,13 @@ $("nextBtn").onclick = () => {
   state.status = Status.Menu;
   show("menuPanel");
   syncControls();
-  startMatch(false);
+  if (state.matchMode === "bot") {
+    startMatch(true);
+  } else if (state.matchMode === "ai") {
+    startAiBattle();
+  } else {
+    startMatch(false);
+  }
 };
 
 $("backBtn").onclick = () => {

@@ -159,7 +159,8 @@ type GameMsg struct {
 	Username      string                 `protobuf:"bytes,6,opt,name=username,proto3" json:"username,omitempty"`
 	Password      string                 `protobuf:"bytes,7,opt,name=password,proto3" json:"password,omitempty"`
 	UserId        int32                  `protobuf:"varint,8,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	VsBot         bool                   `protobuf:"varint,9,opt,name=vs_bot,json=vsBot,proto3" json:"vs_bot,omitempty"` // 是否匹配人机
+	VsBot         bool                   `protobuf:"varint,9,opt,name=vs_bot,json=vsBot,proto3" json:"vs_bot,omitempty"`       // 是否匹配人机
+	AiVsAi        bool                   `protobuf:"varint,10,opt,name=ai_vs_ai,json=aiVsAi,proto3" json:"ai_vs_ai,omitempty"` // 是否 AI 自动对战
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -257,11 +258,18 @@ func (x *GameMsg) GetVsBot() bool {
 	return false
 }
 
+func (x *GameMsg) GetAiVsAi() bool {
+	if x != nil {
+		return x.AiVsAi
+	}
+	return false
+}
+
 var File_proto_gobang_proto protoreflect.FileDescriptor
 
 const file_proto_gobang_proto_rawDesc = "" +
 	"\n" +
-	"\x12proto/gobang.proto\x12\x06gobang\"\xf4\x01\n" +
+	"\x12proto/gobang.proto\x12\x06gobang\"\x8e\x02\n" +
 	"\aGameMsg\x12*\n" +
 	"\bmsg_type\x18\x01 \x01(\x0e2\x0f.gobang.MsgTypeR\amsgType\x12'\n" +
 	"\x05chess\x18\x02 \x01(\x0e2\x11.gobang.ChessTypeR\x05chess\x12\f\n" +
@@ -271,7 +279,9 @@ const file_proto_gobang_proto_rawDesc = "" +
 	"\busername\x18\x06 \x01(\tR\busername\x12\x1a\n" +
 	"\bpassword\x18\a \x01(\tR\bpassword\x12\x17\n" +
 	"\auser_id\x18\b \x01(\x05R\x06userId\x12\x15\n" +
-	"\x06vs_bot\x18\t \x01(\bR\x05vsBot*,\n" +
+	"\x06vs_bot\x18\t \x01(\bR\x05vsBot\x12\x18\n" +
+	"\bai_vs_ai\x18\n" +
+	" \x01(\bR\x06aiVsAi*,\n" +
 	"\tChessType\x12\t\n" +
 	"\x05EMPTY\x10\x00\x12\t\n" +
 	"\x05BLACK\x10\x01\x12\t\n" +

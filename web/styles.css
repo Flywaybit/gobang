@@ -79,17 +79,25 @@ button:disabled {
   border: 2px solid #5b3714;
   box-shadow: 0 8px 20px rgba(24, 28, 32, .16);
   margin: 0 auto;
-  padding: 7%;
+  padding: 5%;
 }
-.board::before {
-  content: "";
+.grid-line {
   position: absolute;
-  inset: 7%;
-  background:
-    repeating-linear-gradient(to right, #1a1712 0 1px, transparent 1px calc(100% / 14)),
-    repeating-linear-gradient(to bottom, #1a1712 0 1px, transparent 1px calc(100% / 14));
-  background-size: calc(100% + 1px) calc(100% + 1px);
+  background: #1a1712;
   pointer-events: none;
+  z-index: 2;
+}
+.grid-line.vertical {
+  top: 7%;
+  height: 86%;
+  width: 1px;
+  transform: translateX(-.5px);
+}
+.grid-line.horizontal {
+  left: 7%;
+  width: 86%;
+  height: 1px;
+  transform: translateY(-.5px);
 }
 .star {
   position: absolute;
@@ -99,7 +107,7 @@ button:disabled {
   background: #15120e;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  z-index: 1;
+  z-index: 3;
 }
 .cell {
   position: absolute;
@@ -112,7 +120,10 @@ button:disabled {
   margin: 0;
   padding: 0;
   cursor: pointer;
-  z-index: 2;
+  z-index: 1;
+}
+.cell.black, .cell.white {
+  z-index: 4;
 }
 .cell:hover {
   outline: 2px solid rgba(31, 111, 235, .38);
