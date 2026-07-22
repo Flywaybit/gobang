@@ -1,0 +1,9 @@
+2026-07-22 10:10:51 MongoDB 连接失败：server selection error: context deadline exceeded, current topology: { Type: Unknown, Servers: [{ Addr: 127.0.0.1:27017, Type: Unknown, Last error: dial tcp 127.0.0.1:27017: connectex: No connection could be made because the target machine actively refused it. }, ] }
+2026-07-22 10:11:29 MongoDB 连接成功，数据库：gobang
+2026-07-22 10:11:29 TCP Protobuf 服务启动：127.0.0.1:8888
+2026-07-22 10:11:29 Web 服务启动：http://127.0.0.1:8889
+2026-07-22 10:11:59 WebSocket 客户端接入：127.0.0.1:62662
+2026-07-22 10:12:19 玩家登录成功：user_id=2 username=hhh
+2026-07-22 10:12:19 服务端推送：to_user_id=2 to_username=hhh msg_type=MSG_LOGIN_RESP chess=EMPTY x=0 y=0 tip=登录成功
+2026-07-22 10:12:20 玩家请求人机对战：user_id=2 username=hhh
+2026-07-22 10:18:31 服务端开始关闭

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	applog "gobang/log"
 	"gobang/pb"
 	"gobang/server/session"
 	"net/http"
@@ -36,9 +36,9 @@ func startWebServer() {
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.Dir(webDir())))
 	mux.HandleFunc("/ws", handleWebSocket)
-	fmt.Println("Web server started: http://127.0.0.1:8889")
+	applog.Servicef("Web 服务启动：http://127.0.0.1:8889")
 	if err := http.ListenAndServe("127.0.0.1:8889", mux); err != nil {
-		fmt.Println("Web server stopped:", err)
+		applog.Servicef("Web 服务停止：%v", err)
 	}
 }
 
@@ -54,6 +54,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+	applog.Servicef("WebSocket 客户端接入：%s", r.RemoteAddr)
 	peer := &wsPeer{conn: conn}
 	player := manager.AddSession(func(msg *pb.GameMsg) error {
 		peer.mu.Lock()
@@ -72,7 +73,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	for {
 		var webMsg WebMsg
 		if err := conn.ReadJSON(&webMsg); err != nil {
-			fmt.Println("Web player disconnected:", player.Username)
+			applog.Servicef("Web 玩家离线：user_id=%d username=%s", player.UserID, player.Username)
 			return
 		}
 		handleGameMsg(player, toPB(webMsg))

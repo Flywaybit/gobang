@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	applog "gobang/log"
 	"gobang/pb"
 	"gobang/server/dao"
 	"gobang/server/model"
@@ -27,19 +28,26 @@ var (
 )
 
 func main() {
+	if err := applog.Init(); err != nil {
+		fmt.Println("初始化日志失败：", err)
+		return
+	}
+	defer applog.Close()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	var err error
 	store, err = dao.NewStore(ctx, "mongodb://127.0.0.1:27017", "gobang")
 	if err != nil {
-		fmt.Println("MongoDB connection failed:", err)
+		applog.Servicef("MongoDB 连接失败：%v", err)
 		return
 	}
 	if err := store.EnsureIndexes(ctx); err != nil {
-		fmt.Println("MongoDB index initialization failed:", err)
+		applog.Servicef("MongoDB 索引初始化失败：%v", err)
 		return
 	}
+	applog.Servicef("MongoDB 连接成功，数据库：gobang")
 	defer store.Disconnect(context.Background())
 
 	authService = service.NewAuthService(store.Users)
@@ -48,17 +56,17 @@ func main() {
 
 	listener, err := net.Listen("tcp", "127.0.0.1:8888")
 	if err != nil {
-		fmt.Println("TCP listen failed:", err)
+		applog.Servicef("TCP 监听失败：%v", err)
 		return
 	}
 	defer listener.Close()
-	fmt.Println("Protobuf Gobang TCP server started: 127.0.0.1:8888")
+	applog.Servicef("TCP Protobuf 服务启动：127.0.0.1:8888")
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-stop
-		fmt.Println("Server shutting down...")
+		applog.Servicef("服务端开始关闭")
 		_ = listener.Close()
 		closeActiveGames()
 		_ = store.Disconnect(context.Background())
@@ -77,6 +85,7 @@ func main() {
 		player.Send = func(msg *pb.GameMsg) error {
 			return sendMsg(conn, msg)
 		}
+		applog.Servicef("TCP 客户端接入：%s", conn.RemoteAddr())
 		go handlePlayer(player)
 	}
 }
@@ -93,7 +102,7 @@ func handlePlayer(player *session.PlayerSession) {
 	for {
 		msg, err := readMsg(player.Conn)
 		if err != nil {
-			fmt.Println("TCP player disconnected:", player.Username)
+			applog.Servicef("TCP 玩家离线：user_id=%d username=%s", player.UserID, player.Username)
 			return
 		}
 		handleGameMsg(player, msg)
@@ -120,13 +129,16 @@ func handleGameMsg(player *session.PlayerSession, msg *pb.GameMsg) {
 func handleRegister(player *session.PlayerSession, msg *pb.GameMsg) {
 	user, err := authService.Register(msg.Username, msg.Password)
 	if err != nil {
+		applog.Servicef("注册失败：username=%s err=%v", msg.Username, err)
 		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_REGISTER_RESP, Tip: err.Error()})
 		return
 	}
 	if err := manager.Authenticate(player, user.UserID, user.Username); err != nil {
+		applog.Servicef("注册后登录失败：user_id=%d username=%s err=%v", user.UserID, user.Username, err)
 		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_REGISTER_RESP, Tip: err.Error()})
 		return
 	}
+	applog.Servicef("玩家注册成功并登录：user_id=%d username=%s", user.UserID, user.Username)
 	sendToPlayer(player, &pb.GameMsg{
 		MsgType:  pb.MsgType_MSG_REGISTER_RESP,
 		UserId:   user.UserID,
@@ -138,13 +150,16 @@ func handleRegister(player *session.PlayerSession, msg *pb.GameMsg) {
 func handleLogin(player *session.PlayerSession, msg *pb.GameMsg) {
 	user, err := authService.Login(msg.Username, msg.Password)
 	if err != nil {
+		applog.Servicef("登录失败：username=%s err=%v", msg.Username, err)
 		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_LOGIN_RESP, Tip: err.Error()})
 		return
 	}
 	if err := manager.Authenticate(player, user.UserID, user.Username); err != nil {
+		applog.Servicef("登录拒绝：user_id=%d username=%s err=%v", user.UserID, user.Username, err)
 		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_LOGIN_RESP, Tip: err.Error()})
 		return
 	}
+	applog.Servicef("玩家登录成功：user_id=%d username=%s", user.UserID, user.Username)
 	sendToPlayer(player, &pb.GameMsg{
 		MsgType:  pb.MsgType_MSG_LOGIN_RESP,
 		UserId:   user.UserID,
@@ -159,11 +174,14 @@ func handleMatchRequest(player *session.PlayerSession, msg *pb.GameMsg) {
 		return
 	}
 	if msg.VsBot {
+		applog.Servicef("玩家请求人机对战：user_id=%d username=%s", player.UserID, player.Username)
 		game, err := matchSvc.JoinBot(player)
 		if err != nil {
+			applog.Servicef("人机对战创建失败：user_id=%d err=%v", player.UserID, err)
 			sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: err.Error()})
 			return
 		}
+		logGameStart(game)
 		sendToPlayer(game.Black, service.StartMsg(pb.ChessType_BLACK, game.Black.UserID))
 		if game.Current == pb.ChessType_WHITE {
 			go playBotTurn(game)
@@ -172,13 +190,16 @@ func handleMatchRequest(player *session.PlayerSession, msg *pb.GameMsg) {
 	}
 	game, matched, err := matchSvc.Join(player)
 	if err != nil {
+		applog.Servicef("玩家匹配失败：user_id=%d err=%v", player.UserID, err)
 		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "匹配失败: " + err.Error()})
 		return
 	}
 	if !matched {
+		applog.Servicef("玩家进入匹配队列：user_id=%d username=%s", player.UserID, player.Username)
 		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_WAIT, Tip: "已进入匹配队列，等待对手..."})
 		return
 	}
+	logGameStart(game)
 	sendToPlayer(game.Black, service.StartMsg(pb.ChessType_BLACK, game.Black.UserID))
 	sendToPlayer(game.White, service.StartMsg(pb.ChessType_WHITE, game.White.UserID))
 }
@@ -237,6 +258,7 @@ func handlePut(player *session.PlayerSession, msg *pb.GameMsg) {
 	}
 
 	broadcastGame(game, putMsg)
+	logMove(game, player.UserID, selfChess, x, y)
 
 	move := model.Move{UserID: player.UserID, Chess: int32(selfChess), X: x, Y: y, At: time.Now()}
 	go func() {
@@ -257,12 +279,14 @@ func handlePut(player *session.PlayerSession, msg *pb.GameMsg) {
 			sendToPlayer(loser, &pb.GameMsg{MsgType: pb.MsgType_MSG_WIN, Chess: selfChess, UserId: winnerID, Tip: "对手五子连珠，你输了"})
 		}
 		finishGame(game)
+		logGameEnd(game, "胜负", winnerID, loserID)
 		go persistGameResult(game.DBID, winnerID, loserID)
 		return
 	}
 	if draw {
 		broadcastGame(game, &pb.GameMsg{MsgType: pb.MsgType_MSG_DRAW, Tip: "棋盘已满，本局平局"})
 		finishGame(game)
+		logGameEnd(game, "平局", 0, 0)
 		go persistGameDraw(game.DBID)
 		return
 	}
@@ -274,6 +298,7 @@ func handlePut(player *session.PlayerSession, msg *pb.GameMsg) {
 func handleQuitGame(player *session.PlayerSession) {
 	if player.State == session.StateMatching {
 		manager.CancelMatching(player)
+		applog.Servicef("玩家退出匹配队列：user_id=%d username=%s", player.UserID, player.Username)
 		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "已退出匹配队列"})
 		return
 	}
@@ -305,6 +330,7 @@ func handleQuitGame(player *session.PlayerSession) {
 	game.Mu.Unlock()
 
 	finishGame(game)
+	logGameEnd(game, "主动退出", winnerID, player.UserID)
 	sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_TIP, Tip: "已退出房间"})
 	if opponent != nil {
 		sendToPlayer(opponent, &pb.GameMsg{
@@ -351,6 +377,7 @@ func handleInterruptedGame(game *session.GameContext, leaver *session.PlayerSess
 	game.Mu.Unlock()
 
 	finishGame(game)
+	logGameEnd(game, "断线退出", winnerID, leaver.UserID)
 	if opponent != nil {
 		sendToPlayer(opponent, &pb.GameMsg{
 			MsgType: pb.MsgType_MSG_WIN,
@@ -424,6 +451,7 @@ func playBotTurn(game *session.GameContext) {
 		return
 	}
 	broadcastGame(game, putMsg)
+	logMove(game, bot.UserID, bot.Chess, x, y)
 	move := model.Move{UserID: bot.UserID, Chess: int32(bot.Chess), X: x, Y: y, At: time.Now()}
 	go func() {
 		ctx, cancel := dao.TimeoutContext()
@@ -435,12 +463,14 @@ func playBotTurn(game *session.GameContext) {
 		loserID := game.BlackID
 		sendToPlayer(game.Black, &pb.GameMsg{MsgType: pb.MsgType_MSG_WIN, Chess: bot.Chess, UserId: winnerID, Tip: "Bot 五子连珠，你输了"})
 		finishGame(game)
+		logGameEnd(game, "胜负", winnerID, loserID)
 		go persistGameResult(game.DBID, winnerID, loserID)
 		return
 	}
 	if draw {
 		broadcastGame(game, &pb.GameMsg{MsgType: pb.MsgType_MSG_DRAW, Tip: "棋盘已满，本局平局"})
 		finishGame(game)
+		logGameEnd(game, "平局", 0, 0)
 		go persistGameDraw(game.DBID)
 	}
 }
@@ -450,10 +480,12 @@ func sendToPlayer(player *session.PlayerSession, msg *pb.GameMsg) {
 		return
 	}
 	if player.Send != nil {
+		logPush(player, msg)
 		_ = player.Send(msg)
 		return
 	}
 	if player.Conn != nil {
+		logPush(player, msg)
 		_ = sendMsg(player.Conn, msg)
 	}
 }
@@ -461,6 +493,49 @@ func sendToPlayer(player *session.PlayerSession, msg *pb.GameMsg) {
 func broadcastGame(game *session.GameContext, msg *pb.GameMsg) {
 	sendToPlayer(game.Black, msg)
 	sendToPlayer(game.White, msg)
+}
+
+func logGameStart(game *session.GameContext) {
+	mode := "玩家对战"
+	if game.VsBot {
+		mode = "人机对战"
+	}
+	applog.GameLine("")
+	applog.GameLine("============================================================")
+	applog.Gamef("对局开始：game_id=%s mode=%s black_id=%d black_name=%s white_id=%d white_name=%s",
+		game.ID, mode, game.BlackID, playerName(game.Black), game.WhiteID, playerName(game.White))
+}
+
+func logMove(game *session.GameContext, userID int32, chess pb.ChessType, x, y int32) {
+	applog.Gamef("对局落子：user_id=%d chess=%s x=%d y=%d", userID, chess.String(), x, y)
+}
+
+func logGameEnd(game *session.GameContext, reason string, winnerID, loserID int32) {
+	applog.Gamef("对局结束：game_id=%s reason=%s black_id=%d white_id=%d winner_id=%d loser_id=%d",
+		game.ID, reason, game.BlackID, game.WhiteID, winnerID, loserID)
+	applog.GameLine("============================================================")
+}
+
+func logPush(player *session.PlayerSession, msg *pb.GameMsg) {
+	if isGamePush(msg.MsgType) {
+		return
+	}
+	applog.Servicef("服务端推送：to_user_id=%d to_username=%s msg_type=%s chess=%s x=%d y=%d tip=%s",
+		player.UserID, player.Username, msg.MsgType.String(), msg.Chess.String(), msg.X, msg.Y, msg.Tip)
+}
+
+func isGamePush(msgType pb.MsgType) bool {
+	return msgType == pb.MsgType_MSG_START ||
+		msgType == pb.MsgType_MSG_PUT ||
+		msgType == pb.MsgType_MSG_WIN ||
+		msgType == pb.MsgType_MSG_DRAW
+}
+
+func playerName(player *session.PlayerSession) string {
+	if player == nil {
+		return ""
+	}
+	return player.Username
 }
 
 func finishGame(game *session.GameContext) {

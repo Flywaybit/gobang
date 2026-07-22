@@ -1,0 +1,30 @@
+2026-07-22 10:12:20 对局开始：game_id=6a6027045b9159817a07a9cd mode=人机对战 black_id=2 black_name=hhh white_id=-1 white_name=Bot_1
+2026-07-22 10:12:25 对局落子：game_id=6a6027045b9159817a07a9cd user_id=2 chess=BLACK x=6 y=6
+2026-07-22 10:12:25 对局落子：game_id=6a6027045b9159817a07a9cd user_id=-1 chess=WHITE x=7 y=7
+2026-07-22 10:12:28 对局落子：game_id=6a6027045b9159817a07a9cd user_id=2 chess=BLACK x=7 y=6
+2026-07-22 10:12:28 对局落子：game_id=6a6027045b9159817a07a9cd user_id=-1 chess=WHITE x=8 y=6
+2026-07-22 10:12:32 对局落子：game_id=6a6027045b9159817a07a9cd user_id=2 chess=BLACK x=5 y=6
+2026-07-22 10:12:32 对局落子：game_id=6a6027045b9159817a07a9cd user_id=-1 chess=WHITE x=6 y=8
+2026-07-22 10:12:34 对局落子：game_id=6a6027045b9159817a07a9cd user_id=2 chess=BLACK x=9 y=5
+2026-07-22 10:12:34 对局落子：game_id=6a6027045b9159817a07a9cd user_id=-1 chess=WHITE x=5 y=9
+2026-07-22 10:12:35 对局落子：game_id=6a6027045b9159817a07a9cd user_id=2 chess=BLACK x=4 y=10
+2026-07-22 10:12:35 对局落子：game_id=6a6027045b9159817a07a9cd user_id=-1 chess=WHITE x=8 y=7
+2026-07-22 10:12:38 对局落子：game_id=6a6027045b9159817a07a9cd user_id=2 chess=BLACK x=8 y=8
+2026-07-22 10:12:38 对局落子：game_id=6a6027045b9159817a07a9cd user_id=-1 chess=WHITE x=9 y=7
+2026-07-22 10:12:41 对局落子：game_id=6a6027045b9159817a07a9cd user_id=2 chess=BLACK x=10 y=7
+2026-07-22 10:12:41 对局落子：game_id=6a6027045b9159817a07a9cd user_id=-1 chess=WHITE x=6 y=7
+2026-07-22 10:12:43 对局落子：game_id=6a6027045b9159817a07a9cd user_id=2 chess=BLACK x=5 y=7
+2026-07-22 10:12:43 对局落子：game_id=6a6027045b9159817a07a9cd user_id=-1 chess=WHITE x=7 y=5
+2026-07-22 10:12:47 对局落子：game_id=6a6027045b9159817a07a9cd user_id=2 chess=BLACK x=10 y=8
+2026-07-22 10:12:47 对局落子：game_id=6a6027045b9159817a07a9cd user_id=-1 chess=WHITE x=9 y=8
+2026-07-22 10:12:55 对局落子：game_id=6a6027045b9159817a07a9cd user_id=2 chess=BLACK x=4 y=6
+2026-07-22 10:12:55 对局落子：game_id=6a6027045b9159817a07a9cd user_id=-1 chess=WHITE x=3 y=6
+2026-07-22 10:12:57 对局落子：game_id=6a6027045b9159817a07a9cd user_id=2 chess=BLACK x=10 y=6
+2026-07-22 10:12:57 对局落子：game_id=6a6027045b9159817a07a9cd user_id=-1 chess=WHITE x=10 y=9
+2026-07-22 10:12:59 对局落子：game_id=6a6027045b9159817a07a9cd user_id=2 chess=BLACK x=11 y=10
+2026-07-22 10:12:59 对局落子：game_id=6a6027045b9159817a07a9cd user_id=-1 chess=WHITE x=9 y=9
+2026-07-22 10:13:02 对局落子：game_id=6a6027045b9159817a07a9cd user_id=2 chess=BLACK x=11 y=9
+2026-07-22 10:13:02 对局落子：game_id=6a6027045b9159817a07a9cd user_id=-1 chess=WHITE x=9 y=10
+2026-07-22 10:13:04 对局落子：game_id=6a6027045b9159817a07a9cd user_id=2 chess=BLACK x=9 y=11
+2026-07-22 10:13:04 对局落子：game_id=6a6027045b9159817a07a9cd user_id=-1 chess=WHITE x=9 y=6
+2026-07-22 10:13:04 对局结束：game_id=6a6027045b9159817a07a9cd reason=胜负 black_id=2 white_id=-1 winner_id=-1 loser_id=2
