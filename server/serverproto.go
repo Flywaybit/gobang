@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gobang/common"
 	applog "gobang/log"
 	"gobang/pb"
+	"gobang/server/config"
 	"gobang/server/dao"
 	"gobang/server/model"
 	"gobang/server/service"
 	"gobang/server/session"
+	"gobang/server/tick"
 	"net"
 	"os"
 	"os/signal"
@@ -25,10 +28,13 @@ var (
 	store       *dao.Store
 	authService *service.AuthService
 	matchSvc    *service.MatchService
-	botPool     = service.NewBotPool(10)
+	botPool     *service.BotPool
 )
 
 func main() {
+	cfg := config.GetConfigMgr()
+	botPool = service.NewBotPool(cfg.BotPoolSize())
+
 	if err := applog.Init(); err != nil {
 		fmt.Println("初始化日志失败：", err)
 		return
@@ -39,7 +45,7 @@ func main() {
 	defer cancel()
 
 	var err error
-	store, err = dao.NewStore(ctx, "mongodb://127.0.0.1:27017", "gobang")
+	store, err = dao.NewStore(ctx, cfg.MongoURI(), cfg.MongoDB())
 	if err != nil {
 		applog.Servicef("MongoDB 连接失败：%v", err)
 		return
@@ -48,26 +54,30 @@ func main() {
 		applog.Servicef("MongoDB 索引初始化失败：%v", err)
 		return
 	}
-	applog.Servicef("MongoDB 连接成功，数据库：gobang")
+	applog.Servicef("MongoDB 连接成功，数据库：%s", cfg.MongoDB())
 	defer store.Disconnect(context.Background())
 
 	authService = service.NewAuthService(store.Users)
 	matchSvc = service.NewMatchService(manager, store.Games, botPool)
+	botTickCtx, stopBotTick := context.WithCancel(context.Background())
+	defer stopBotTick()
+	go tick.NewBotTicker(manager, playBotTurn).Start(botTickCtx)
 	go startWebServer()
 
-	listener, err := net.Listen("tcp", "127.0.0.1:8888")
+	listener, err := net.Listen("tcp", cfg.TCPAddr())
 	if err != nil {
 		applog.Servicef("TCP 监听失败：%v", err)
 		return
 	}
 	defer listener.Close()
-	applog.Servicef("TCP Protobuf 服务启动：127.0.0.1:8888")
+	applog.Servicef("TCP Protobuf 服务启动：%s", cfg.TCPAddr())
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-stop
 		applog.Servicef("服务端开始关闭")
+		stopBotTick()
 		_ = listener.Close()
 		closeActiveGames()
 		_ = store.Disconnect(context.Background())
@@ -84,7 +94,7 @@ func main() {
 		}
 		player := manager.AddConn(conn)
 		player.Send = func(msg *pb.GameMsg) error {
-			return sendMsg(conn, msg)
+			return common.SendMsg(conn, msg)
 		}
 		applog.Servicef("TCP 客户端接入：%s", conn.RemoteAddr())
 		go handlePlayer(player)
@@ -101,7 +111,7 @@ func handlePlayer(player *session.PlayerSession) {
 	}()
 
 	for {
-		msg, err := readMsg(player.Conn)
+		msg, err := common.ReadMsg(player.Conn)
 		if err != nil {
 			applog.Servicef("TCP 玩家离线：user_id=%d username=%s", player.UserID, player.Username)
 			return
@@ -188,9 +198,6 @@ func handleMatchRequest(player *session.PlayerSession, msg *pb.GameMsg) {
 		}
 		logGameStart(game)
 		sendToPlayer(game.Black, service.StartMsg(pb.ChessType_BLACK, game.Black.UserID))
-		if game.Current == pb.ChessType_WHITE {
-			go playBotTurn(game)
-		}
 		return
 	}
 	game, matched, err := matchSvc.Join(player)
@@ -232,7 +239,7 @@ func handlePut(player *session.PlayerSession, msg *pb.GameMsg) {
 		tip = "对局已结束"
 	} else if game.Current != selfChess {
 		tip = "未到你的回合，请等待对手"
-	} else if x < 0 || x >= Size || y < 0 || y >= Size || game.Board[y][x] != pb.ChessType_EMPTY {
+	} else if x < 0 || x >= common.Size || y < 0 || y >= common.Size || game.Board[y][x] != pb.ChessType_EMPTY {
 		tip = "落子位置非法，重新输入"
 	} else {
 		game.Board[y][x] = selfChess
@@ -294,9 +301,6 @@ func handlePut(player *session.PlayerSession, msg *pb.GameMsg) {
 		logGameEnd(game, "平局", 0, 0)
 		go persistGameDraw(game.DBID)
 		return
-	}
-	if game.VsBot && game.Current == pb.ChessType_WHITE {
-		go playBotTurn(game)
 	}
 }
 
@@ -419,7 +423,7 @@ func playBotTurn(game *session.GameContext) {
 		return
 	}
 
-	var board [Size][Size]pb.ChessType
+	var board [common.Size][common.Size]pb.ChessType
 	game.Mu.Lock()
 	if game.Finished || game.Current != bot.Chess {
 		game.Mu.Unlock()
@@ -437,7 +441,7 @@ func playBotTurn(game *session.GameContext) {
 	var win bool
 	var draw bool
 	game.Mu.Lock()
-	if !game.Finished && game.Current == bot.Chess && x >= 0 && x < Size && y >= 0 && y < Size && game.Board[y][x] == pb.ChessType_EMPTY {
+	if !game.Finished && game.Current == bot.Chess && x >= 0 && x < common.Size && y >= 0 && y < common.Size && game.Board[y][x] == pb.ChessType_EMPTY {
 		game.Board[y][x] = bot.Chess
 		win = isWinLocked(game, int(x), int(y), bot.Chess)
 		if win {
@@ -510,7 +514,7 @@ func startAIVsAIGame(watcher *session.PlayerSession) {
 func runAIVsAILoop(game *session.GameContext, aiClient *service.OpenAIClient) {
 	var moves []model.Move
 	last := "-"
-	for turn := 1; turn <= Size*Size; turn++ {
+	for turn := 1; turn <= common.Size*common.Size; turn++ {
 		game.Mu.Lock()
 		if game.Finished {
 			game.Mu.Unlock()
@@ -540,7 +544,7 @@ func runAIVsAILoop(game *session.GameContext, aiClient *service.OpenAIClient) {
 			go persistGameDraw(game.DBID)
 			return
 		}
-		if x < 0 || x >= Size || y < 0 || y >= Size || board[y][x] != pb.ChessType_EMPTY {
+		if x < 0 || x >= common.Size || y < 0 || y >= common.Size || board[y][x] != pb.ChessType_EMPTY {
 			fx, fy, ok := service.BestBotMove(board, current)
 			if !ok {
 				broadcastGame(game, &pb.GameMsg{MsgType: pb.MsgType_MSG_DRAW, Tip: "棋盘已满，本局平局"})
@@ -566,7 +570,7 @@ func applyAIMove(game *session.GameContext, chess pb.ChessType, x, y int32, move
 	}
 	var win, draw bool
 	game.Mu.Lock()
-	if game.Finished || game.Current != chess || x < 0 || x >= Size || y < 0 || y >= Size || game.Board[y][x] != pb.ChessType_EMPTY {
+	if game.Finished || game.Current != chess || x < 0 || x >= common.Size || y < 0 || y >= common.Size || game.Board[y][x] != pb.ChessType_EMPTY {
 		game.Mu.Unlock()
 		return false
 	}
@@ -640,7 +644,7 @@ func sendToPlayer(player *session.PlayerSession, msg *pb.GameMsg) {
 	}
 	if player.Conn != nil {
 		logPush(player, msg)
-		_ = sendMsg(player.Conn, msg)
+		_ = common.SendMsg(player.Conn, msg)
 	}
 }
 
@@ -715,13 +719,13 @@ func isWinLocked(game *session.GameContext, x, y int, chess pb.ChessType) bool {
 		cnt := 1
 		dx, dy := d[0], d[1]
 		tmpx, tmpy := x+dx, y+dy
-		for tmpx >= 0 && tmpx < Size && tmpy >= 0 && tmpy < Size && game.Board[tmpy][tmpx] == chess {
+		for tmpx >= 0 && tmpx < common.Size && tmpy >= 0 && tmpy < common.Size && game.Board[tmpy][tmpx] == chess {
 			cnt++
 			tmpx += dx
 			tmpy += dy
 		}
 		tmpx, tmpy = x-dx, y-dy
-		for tmpx >= 0 && tmpx < Size && tmpy >= 0 && tmpy < Size && game.Board[tmpy][tmpx] == chess {
+		for tmpx >= 0 && tmpx < common.Size && tmpy >= 0 && tmpy < common.Size && game.Board[tmpy][tmpx] == chess {
 			cnt++
 			tmpx -= dx
 			tmpy -= dy
@@ -734,8 +738,8 @@ func isWinLocked(game *session.GameContext, x, y int, chess pb.ChessType) bool {
 }
 
 func isBoardFullLocked(game *session.GameContext) bool {
-	for y := 0; y < Size; y++ {
-		for x := 0; x < Size; x++ {
+	for y := 0; y < common.Size; y++ {
+		for x := 0; x < common.Size; x++ {
 			if game.Board[y][x] == pb.ChessType_EMPTY {
 				return false
 			}

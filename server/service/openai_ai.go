@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"gobang/pb"
+	"gobang/server/config"
 	"io"
 	"net/http"
 	"os"
@@ -61,29 +62,15 @@ type aiMove struct {
 }
 
 func NewOpenAIClientFromEnv() (*OpenAIClient, error) {
-	apiKey := strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
+	cfg := config.GetConfigMgr()
+	apiKey := cfg.OpenAIAPIKey()
 	if apiKey == "" {
 		return nil, errors.New("未配置 OPENAI_API_KEY，无法启动 AI 对战")
 	}
-	model := strings.TrimSpace(os.Getenv("OPENAI_MODEL"))
-	if model == "" {
-		model = "gpt-5.5"
-	}
-	baseURL := strings.TrimSpace(os.Getenv("OPENAI_BASE_URL"))
-	if baseURL == "" {
-		baseURL = strings.TrimSpace(os.Getenv("OPENAI_API_BASE"))
-	}
-	if baseURL == "" {
-		baseURL = "https://outllm.chaoziran.com"
-	}
-	baseURL = strings.TrimRight(baseURL, "/")
-	if !strings.HasSuffix(baseURL, "/v1") {
-		baseURL += "/v1"
-	}
 	return &OpenAIClient{
 		apiKey:  apiKey,
-		model:   model,
-		baseURL: baseURL,
+		model:   cfg.OpenAIModel(),
+		baseURL: cfg.OpenAIBaseURL(),
 		cache:   &PromptCache{items: make(map[string]promptItem)},
 		http:    &http.Client{Timeout: 30 * time.Second},
 	}, nil

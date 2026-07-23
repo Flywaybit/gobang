@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"gobang/common"
 	"gobang/pb"
 	"net"
 	"os"
@@ -27,7 +28,7 @@ const (
 type ClientApp struct {
 	mu           sync.RWMutex
 	currentState ClientState
-	localBoard   [Size][Size]pb.ChessType
+	localBoard   [common.Size][common.Size]pb.ChessType
 	selfChess    pb.ChessType
 	userID       int32
 	username     string
@@ -54,7 +55,7 @@ func main() {
 
 func recvLoop(conn net.Conn, app *ClientApp) {
 	for {
-		msg, err := readMsg(conn)
+		msg, err := common.ReadMsg(conn)
 		if err != nil {
 			fmt.Println("\n服务器断开，游戏退出")
 			os.Exit(0)
@@ -81,7 +82,7 @@ func recvLoop(conn net.Conn, app *ClientApp) {
 			app.mu.Lock()
 			app.selfChess = msg.Chess
 			app.currentState = StatusPlaying
-			app.localBoard = [Size][Size]pb.ChessType{}
+			app.localBoard = [common.Size][common.Size]pb.ChessType{}
 			app.lastResult = ""
 			app.mu.Unlock()
 			app.notify()
@@ -91,7 +92,7 @@ func recvLoop(conn net.Conn, app *ClientApp) {
 			printBoard(app)
 		case pb.MsgType_MSG_PUT:
 			app.mu.Lock()
-			if msg.Y >= 0 && msg.Y < Size && msg.X >= 0 && msg.X < Size {
+			if msg.Y >= 0 && msg.Y < common.Size && msg.X >= 0 && msg.X < common.Size {
 				app.localBoard[msg.Y][msg.X] = msg.Chess
 			}
 			app.mu.Unlock()
@@ -101,7 +102,7 @@ func recvLoop(conn net.Conn, app *ClientApp) {
 			app.mu.Lock()
 			app.currentState = StatusGameOver
 			app.lastResult = msg.Tip
-			app.localBoard = [Size][Size]pb.ChessType{}
+			app.localBoard = [common.Size][common.Size]pb.ChessType{}
 			app.mu.Unlock()
 			app.notify()
 			fmt.Println("\n===== 对局结算 =====")
@@ -110,7 +111,7 @@ func recvLoop(conn net.Conn, app *ClientApp) {
 			app.mu.Lock()
 			app.currentState = StatusGameOver
 			app.lastResult = msg.Tip
-			app.localBoard = [Size][Size]pb.ChessType{}
+			app.localBoard = [common.Size][common.Size]pb.ChessType{}
 			app.mu.Unlock()
 			app.notify()
 			fmt.Println("\n===== 对局结算 =====")
@@ -224,7 +225,7 @@ func sendAuth(conn net.Conn, app *ClientApp, action, username, password string) 
 		msgType = pb.MsgType_MSG_REGISTER_REQ
 	}
 	app.setState(StatusAuthPending)
-	_ = sendMsg(conn, &pb.GameMsg{
+	_ = common.SendMsg(conn, &pb.GameMsg{
 		MsgType:  msgType,
 		Username: username,
 		Password: password,
@@ -237,11 +238,11 @@ func handleMainMenuInput(conn net.Conn, app *ClientApp, input string) {
 	case "A":
 		app.setState(StatusMatching)
 		_, userID := app.identity()
-		_ = sendMsg(conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_MATCH_REQ, UserId: userID})
+		_ = common.SendMsg(conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_MATCH_REQ, UserId: userID})
 	case "B":
 		app.setState(StatusMatching)
 		_, userID := app.identity()
-		_ = sendMsg(conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_MATCH_REQ, UserId: userID, VsBot: true})
+		_ = common.SendMsg(conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_MATCH_REQ, UserId: userID, VsBot: true})
 	default:
 		fmt.Println("输入错误，请输入 A 或 B")
 	}
@@ -252,7 +253,7 @@ func handlePlayingInput(conn net.Conn, app *ClientApp, input string) {
 		return
 	}
 	if strings.EqualFold(input, "quit") {
-		_ = sendMsg(conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_QUIT_GAME})
+		_ = common.SendMsg(conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_QUIT_GAME})
 		app.setState(StatusMainMenu)
 		return
 	}
@@ -268,7 +269,7 @@ func handlePlayingInput(conn net.Conn, app *ClientApp, input string) {
 		return
 	}
 	chess, userID := app.identity()
-	_ = sendMsg(conn, &pb.GameMsg{
+	_ = common.SendMsg(conn, &pb.GameMsg{
 		MsgType: pb.MsgType_MSG_PUT,
 		Chess:   chess,
 		X:       int32(x),
@@ -283,10 +284,10 @@ func handleGameOverInput(conn net.Conn, app *ClientApp, input string) {
 	case "1":
 		app.setState(StatusMatching)
 		_, userID := app.identity()
-		_ = sendMsg(conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_MATCH_REQ, UserId: userID})
+		_ = common.SendMsg(conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_MATCH_REQ, UserId: userID})
 	case "2":
 		app.setState(StatusMainMenu)
-		_ = sendMsg(conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_QUIT_GAME})
+		_ = common.SendMsg(conn, &pb.GameMsg{MsgType: pb.MsgType_MSG_QUIT_GAME})
 	default:
 		fmt.Println("输入错误，请输入 1 或 2")
 	}
@@ -375,9 +376,9 @@ func printBoard(app *ClientApp) {
 	app.mu.RUnlock()
 
 	fmt.Println("\n    0  1  2  3  4  5  6  7  8  9 10 11 12 13 14")
-	for y := 0; y < Size; y++ {
+	for y := 0; y < common.Size; y++ {
 		fmt.Printf("%2d", y)
-		for x := 0; x < Size; x++ {
+		for x := 0; x < common.Size; x++ {
 			switch board[y][x] {
 			case pb.ChessType_EMPTY:
 				fmt.Print("  ·")

@@ -2,6 +2,7 @@ package applog
 
 import (
 	"fmt"
+	"gobang/server/config"
 	"io"
 	"log"
 	"os"
@@ -72,8 +73,9 @@ func write(logger *log.Logger, format string, args ...any) {
 }
 
 func logDir() string {
+	dir := config.GetConfigMgr().LogDir()
 	if _, err := os.Stat("web/index.html"); err == nil {
-		return "log"
+		return dir
 	}
-	return "../log"
+	return filepath.Join("..", dir)
 }

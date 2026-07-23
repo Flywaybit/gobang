@@ -3,9 +3,11 @@ package main
 import (
 	applog "gobang/log"
 	"gobang/pb"
+	"gobang/server/config"
 	"gobang/server/session"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -34,13 +36,26 @@ var upgrader = websocket.Upgrader{
 }
 
 func startWebServer() {
+	cfg := config.GetConfigMgr()
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.Dir(webDir())))
 	mux.HandleFunc("/ws", handleWebSocket)
-	applog.Servicef("Web 服务启动：http://127.0.0.1:8889")
-	if err := http.ListenAndServe("127.0.0.1:8889", mux); err != nil {
+	applog.Servicef("Web 服务启动：%s，本机访问 %s，局域网访问 http://本机IP%s", cfg.WebAddr(), localWebURL(cfg.WebAddr()), webPort(cfg.WebAddr()))
+	if err := http.ListenAndServe(cfg.WebAddr(), mux); err != nil {
 		applog.Servicef("Web 服务停止：%v", err)
 	}
+}
+
+func localWebURL(addr string) string {
+	return "http://127.0.0.1" + webPort(addr)
+}
+
+func webPort(addr string) string {
+	idx := strings.LastIndex(addr, ":")
+	if idx < 0 {
+		return ""
+	}
+	return addr[idx:]
 }
 
 func webDir() string {

@@ -1,4 +1,4 @@
-package main
+package common
 
 import (
 	"encoding/binary"
@@ -10,7 +10,7 @@ import (
 
 const Size = 15
 
-func sendMsg(conn net.Conn, msg *pb.GameMsg) error {
+func SendMsg(conn net.Conn, msg *pb.GameMsg) error {
 	data, err := proto.Marshal(msg)
 	if err != nil {
 		return err
@@ -25,7 +25,7 @@ func sendMsg(conn net.Conn, msg *pb.GameMsg) error {
 	return err
 }
 
-func readMsg(conn net.Conn) (*pb.GameMsg, error) {
+func ReadMsg(conn net.Conn) (*pb.GameMsg, error) {
 	lenBuf := make([]byte, 4)
 	_, err := conn.Read(lenBuf)
 	if err != nil {
