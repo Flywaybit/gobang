@@ -80,6 +80,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		_, game := manager.RemoveSession(player)
+		delOnline(player)
 		if game != nil {
 			handleInterruptedGame(game, player)
 		}

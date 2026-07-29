@@ -10,6 +10,7 @@ import (
 	"gobang/server/config"
 	"gobang/server/dao"
 	"gobang/server/model"
+	rediscache "gobang/server/redis"
 	"gobang/server/service"
 	"gobang/server/session"
 	"gobang/server/tick"
@@ -26,6 +27,7 @@ import (
 var (
 	manager     = session.NewManager()
 	store       *dao.Store
+	redisMgr    *rediscache.RedisMgr
 	authService *service.AuthService
 	matchSvc    *service.MatchService
 	botPool     *service.BotPool
@@ -56,6 +58,8 @@ func main() {
 	}
 	applog.Servicef("MongoDB 连接成功，数据库：%s", cfg.MongoDB())
 	defer store.Disconnect(context.Background())
+	redisMgr = rediscache.GetRedisMgr()
+	defer redisMgr.Close()
 
 	authService = service.NewAuthService(store.Users)
 	matchSvc = service.NewMatchService(manager, store.Games, botPool)
@@ -80,6 +84,8 @@ func main() {
 		stopBotTick()
 		_ = listener.Close()
 		closeActiveGames()
+		clearOnlineSessions()
+		_ = redisMgr.Close()
 		_ = store.Disconnect(context.Background())
 		os.Exit(0)
 	}()
@@ -104,6 +110,7 @@ func main() {
 func handlePlayer(player *session.PlayerSession) {
 	defer func() {
 		_, game := manager.RemoveConn(player.Conn)
+		delOnline(player)
 		if game != nil {
 			handleInterruptedGame(game, player)
 		}
@@ -144,7 +151,7 @@ func handleRegister(player *session.PlayerSession, msg *pb.GameMsg) {
 		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_REGISTER_RESP, Tip: err.Error()})
 		return
 	}
-	if err := manager.Authenticate(player, user.UserID, user.Username); err != nil {
+	if err := authenticateOnline(player, user.UserID, user.Username); err != nil {
 		applog.Servicef("注册后登录失败：user_id=%d username=%s err=%v", user.UserID, user.Username, err)
 		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_REGISTER_RESP, Tip: err.Error()})
 		return
@@ -165,7 +172,7 @@ func handleLogin(player *session.PlayerSession, msg *pb.GameMsg) {
 		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_LOGIN_RESP, Tip: err.Error()})
 		return
 	}
-	if err := manager.Authenticate(player, user.UserID, user.Username); err != nil {
+	if err := authenticateOnline(player, user.UserID, user.Username); err != nil {
 		applog.Servicef("登录拒绝：user_id=%d username=%s err=%v", user.UserID, user.Username, err)
 		sendToPlayer(player, &pb.GameMsg{MsgType: pb.MsgType_MSG_LOGIN_RESP, Tip: err.Error()})
 		return
@@ -177,6 +184,86 @@ func handleLogin(player *session.PlayerSession, msg *pb.GameMsg) {
 		Username: user.Username,
 		Tip:      "登录成功",
 	})
+}
+
+func authenticateOnline(player *session.PlayerSession, userID int32, username string) error {
+	ttl := config.GetConfigMgr().RedisOnlineTTLSeconds()
+	if player.UserID == userID {
+		if err := redisMgr.RefreshOnline(userID, ttl); err != nil {
+			return err
+		}
+		startOnlineRefresh(player, ttl)
+		return nil
+	}
+	if player.UserID != 0 {
+		return errors.New("当前连接已登录，请先退出后再登录其他账号")
+	}
+
+	online, err := redisMgr.IsOnline(userID)
+	if err != nil {
+		return fmt.Errorf("Redis 在线状态检查失败: %w", err)
+	}
+	if online {
+		return errors.New("用户已在线，禁止重复登录")
+	}
+
+	if err := manager.Authenticate(player, userID, username); err != nil {
+		return err
+	}
+
+	ok, err := redisMgr.SetOnlineIfAbsent(userID, ttl)
+	if err != nil {
+		manager.ClearAuthentication(player)
+		return fmt.Errorf("Redis 在线状态写入失败: %w", err)
+	}
+	if !ok {
+		manager.ClearAuthentication(player)
+		return errors.New("用户已在线，禁止重复登录")
+	}
+	startOnlineRefresh(player, ttl)
+	return nil
+}
+
+func startOnlineRefresh(player *session.PlayerSession, ttlSeconds int) {
+	if player == nil || player.UserID <= 0 || ttlSeconds <= 0 {
+		return
+	}
+	if player.StopOnlineRefresh != nil {
+		player.StopOnlineRefresh()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	player.StopOnlineRefresh = cancel
+	interval := time.Duration(ttlSeconds/2) * time.Second
+	if interval < 30*time.Second {
+		interval = 30 * time.Second
+	}
+	go func(userID int32) {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := redisMgr.RefreshOnline(userID, ttlSeconds); err != nil {
+					applog.Servicef("Redis 在线状态续期失败：user_id=%d err=%v", userID, err)
+				}
+			}
+		}
+	}(player.UserID)
+}
+
+func delOnline(player *session.PlayerSession) {
+	if player == nil || player.UserID <= 0 || redisMgr == nil {
+		return
+	}
+	if player.StopOnlineRefresh != nil {
+		player.StopOnlineRefresh()
+		player.StopOnlineRefresh = nil
+	}
+	if err := redisMgr.DelOnline(player.UserID); err != nil {
+		applog.Servicef("Redis 删除在线状态失败：user_id=%d username=%s err=%v", player.UserID, player.Username, err)
+	}
 }
 
 func handleMatchRequest(player *session.PlayerSession, msg *pb.GameMsg) {
@@ -414,6 +501,12 @@ func closeActiveGames() {
 		if game.White != nil && game.White.Conn != nil {
 			_ = game.White.Conn.Close()
 		}
+	}
+}
+
+func clearOnlineSessions() {
+	for _, player := range manager.ActiveSessions() {
+		delOnline(player)
 	}
 }
 

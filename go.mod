@@ -3,6 +3,7 @@ module gobang
 go 1.25.12
 
 require (
+	github.com/gomodule/redigo v1.9.3
 	github.com/gorilla/websocket v1.5.3
 	go.mongodb.org/mongo-driver/v2 v2.8.0
 	golang.org/x/crypto v0.33.0

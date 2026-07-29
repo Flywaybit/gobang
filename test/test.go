@@ -1,7 +1,7 @@
 package main
 
-// import "fmt"
+import "fmt"
 
-// func main() {
-// 	fmt.Println("undo test marker")
-// }
+func Test() {
+	fmt.Println("undo test marker")
+}

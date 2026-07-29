@@ -19,14 +19,15 @@ const (
 )
 
 type PlayerSession struct {
-	Conn     net.Conn
-	Send     func(*pb.GameMsg) error
-	UserID   int32
-	Username string
-	State    State
-	GameID   string
-	Chess    pb.ChessType
-	IsBot    bool
+	Conn              net.Conn
+	Send              func(*pb.GameMsg) error
+	UserID            int32
+	Username          string
+	State             State
+	GameID            string
+	Chess             pb.ChessType
+	IsBot             bool
+	StopOnlineRefresh func()
 }
 
 type GameContext struct {
@@ -97,6 +98,20 @@ func (m *Manager) Authenticate(s *PlayerSession, userID int32, username string) 
 	s.State = StateAuthenticated
 	m.byUserID[userID] = s
 	return nil
+}
+
+func (m *Manager) ClearAuthentication(s *PlayerSession) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if s == nil {
+		return
+	}
+	if s.UserID != 0 && m.byUserID[s.UserID] == s {
+		delete(m.byUserID, s.UserID)
+	}
+	s.UserID = 0
+	s.Username = ""
+	s.State = StateUnauthenticated
 }
 
 func (m *Manager) GetByConn(conn net.Conn) *PlayerSession {
@@ -315,6 +330,16 @@ func (m *Manager) ActiveGames() []*GameContext {
 		games = append(games, game)
 	}
 	return games
+}
+
+func (m *Manager) ActiveSessions() []*PlayerSession {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	sessions := make([]*PlayerSession, 0, len(m.sessions))
+	for s := range m.sessions {
+		sessions = append(sessions, s)
+	}
+	return sessions
 }
 
 func (g *GameContext) Opponent(s *PlayerSession) *PlayerSession {
